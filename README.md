@@ -7,6 +7,7 @@ A Firefox browser extension for monitoring and visualizing taint flows from SAP 
 - 🦊 Automatic detection of `__taintreport` events
 - 📊 Clear overview of all taint flows
 - 🔍 Filterable list by URL, operation, or taint data
+- ✅ Optional *Unique* mode that only shows the first occurrence of each `(sink string, sink operation, source string, source operation)` combination
 - 📱 Detailed view with the complete flow path (Source → Operations → Sink)
 - 🕒 Timestamp for each report
 - 🧹 Option to delete all reports
@@ -31,20 +32,14 @@ A Firefox browser extension for monitoring and visualizing taint flows from SAP 
 Each taint report contains:
 - **URL**: The page on which the taint flow was detected
 - **Timestamp**: When the flow was detected
-- **Tainted String**: The affected string with highlighted regions
+- **Tainted Source String**: Best-effort reconstruction of where the taint
+  originated (filename/argument/other string), also with highlighting
+- **Operations**: For both sink and source the corresponding operation name
+  (e.g. `innerHTML`, `document.referrer`) is shown next to the strings
 - **Flow Path**: Complete path from source through all operations to the sink
-  - 🔴 **SOURCE**: Origin of the taint data (e.g. `location.hash`)
+  - 🔴 **SOURCE**: Origin of the taint data (e.g. `location.hash`, `document.referrer`)
   - 🔵 **OPERATION**: Transformations (e.g. `substr`, `concat`, `unescape`)
   - 🟡 **SINK**: Endpoint where the data is used (e.g. `innerHTML`)
-
-## Files
-
-- `manifest.json`: Extension configuration
-- `content.js`: Content script for communication with the webpage
-- `injected.js`: Injected script for listening to `__taintreport` events
-- `background.js`: Background script for storing reports
-- `popup.html`: HTML for the popup interface
-- `popup.js`: JavaScript for the popup functionality
 
 ## Development
 
@@ -55,8 +50,11 @@ The extension uses the Manifest V2 format for maximum compatibility with Firefox
 3. **Background Script** stores the reports and updates the badge
 4. **Popup** displays the reports in a user-friendly interface
 
-## Notes
+### Files
 
-- The extension stores a maximum of 100 reports in memory
-- Reports are automatically refreshed in the popup every 2 seconds
-- The extension only works on pages that are instrumented with Foxhound
+- `manifest.json`: Extension configuration
+- `content.js`: Content script for communication with the webpage
+- `injected.js`: Injected script for listening to `__taintreport` events
+- `background.js`: Background script for storing reports
+- `popup.html`: HTML for the popup interface
+- `popup.js`: JavaScript for the popup functionality
