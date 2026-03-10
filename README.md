@@ -35,6 +35,10 @@ A Firefox browser extension for monitoring and visualizing taint flows from SAP 
 4. Select the `manifest.json` file from this folder
 5. The extension will be installed and the Foxhound icon will appear in the toolbar
 
+## Usage
+
+Get familiar with Foxhound and this extension by using the DOM XSS Exercises at [DomGoat](https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345)
+
 ## Structure of Taint Reports
 
 Each taint report contains:
