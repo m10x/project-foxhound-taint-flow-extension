@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px;
+      /* Default popup size */
+      width: 600px;
+      height: 500px;
+    }
+    
+    /* When opened as a full page (not popup), make it use full space */
+    @media screen and (min-width: 800px) {
+      body {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        padding: 0;
+      }
+      
+      .reports-container {
+        height: calc(100vh - 120px) !important;
+      }
+      
+      .report-url {
+        max-width: 80vw !important;
+      }
+      
+      .header {
+        padding: 15px 20px;
+      }
+      
+      .controls {
+        padding: 15px 20px;
+      }
+      
+      .report-item {
+        padding: 15px 20px;
+      }
+    }
+    
+    .header {
+      background: #2c3e50;
+      color: white;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 16px;
+    }
+    
+    .controls {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .filter-input {
+      flex: 1;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    
+    .btn {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    
+    .btn-clear {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .btn-tab {
+      background: #3498db;
+      color: white;
+    }
+    
+    .btn-tab:hover {
+      background: #2980b9;
+    }
+    
+    .reports-container {
+      height: 400px;
+      overflow-y: auto;
+    }
+    
+    .report-item {
+      border-bottom: 1px solid #eee;
+      padding: 10px;
+      transition: background-color 0.2s;
+    }
+    
+    .clickable-header {
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 3px;
+      transition: background-color 0.2s;
+    }
+    
+    .clickable-header:hover {
+      background-color: #f0f0f0;
+    }
+    
+    .report-item.expanded {
+      background-color: #e8f4fd;
+    }
+    
+    .report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    
+    .report-url {
+      font-weight: bold;
+      color: #2c3e50;
+      font-size: 11px;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .report-time {
+      color: #7f8c8d;
+      font-size: 10px;
+    }
+    
+    .taint-summary {
+      color: #e74c3c;
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+    
+    .taint-info {
+      margin-bottom: 3px;
+    }
+    
+    .taint-extract {
+      margin-bottom: 3px;
+    }
+    
+    .taint-label {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    
+    .tainted-part {
+      background: #ffebee;
+      color: #c62828;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-weight: bold;
+      border: 1px solid #ffcdd2;
+    }
+    
+    .tainted-part-detail {
+      margin: 8px 0;
+      padding: 8px;
+      background: #fff3e0;
+      border-left: 4px solid #ff9800;
+      border-radius: 3px;
+    }
+    
+    .taint-range-label {
+      font-weight: bold;
+      color: #e65100;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+    }
+    
+    .tainted-part-text {
+      background: #ffebee;
+      color: #c62828;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-weight: bold;
+      border: 1px solid #ffcdd2;
+      display: inline-block;
+      word-break: break-all;
+    }
+    
+    .taint-string {
+      font-family: monospace;
+      word-break: break-all;
+    }
+    
+    .source-highlight {
+      background: #ffebee;
+      color: #c62828;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-weight: bold;
+      border: 1px solid #ffcdd2;
+    }
+    
+    .sink-highlight {
+      background: #fff3e0;
+      color: #e65100;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-weight: bold;
+      border: 1px solid #ffcc80;
+    }
+    
+    .report-details {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      cursor: text;
+    }
+    
+    .report-details.visible {
+      display: block;
+    }
+    
+    .flow-item {
+      margin: 5px 0;
+      padding: 5px;
+      background: white;
+      border-left: 3px solid #3498db;
+      border-radius: 2px;
+    }
+    
+    .flow-operation {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    
+    .flow-location {
+      color: #7f8c8d;
+      font-size: 9px;
+    }
+    
+    .location-link {
+      color: #3498db;
+      text-decoration: none;
+      cursor: pointer;
+      border-bottom: 1px dotted #3498db;
+      transition: color 0.2s;
+    }
+    
+    .location-link:hover {
+      color: #2980b9;
+      border-bottom-color: #2980b9;
+    }
+    
+    .no-reports {
+      text-align: center;
+      padding: 50px;
+      color: #7f8c8d;
+    }
+    
+    .taint-range {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🦊 Foxhound Taint Monitor</h1>
+    <span id="reportCount">0 reports</span>
+  </div>
+  
+  <div class="controls">
+    <input type="text" id="filterInput" class="filter-input" placeholder="Filter by URL, operation, or taint data...">
+    <button id="openInTabBtn" class="btn btn-tab">Open in Tab</button>
+    <button id="clearBtn" class="btn btn-clear">Clear All</button>
+  </div>
+  
+  <div class="reports-container" id="reportsContainer">
+    <div class="no-reports" id="noReports">
+      No taint flows detected yet.<br>
+      Visit a page with Foxhound to see taint reports.
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

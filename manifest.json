@@ -1,0 +1,46 @@
+{
+  "manifest_version": 2,
+  "name": "Foxhound Taint Flow Monitor",
+  "version": "1.0",
+  "description": "Monitor and display taint flows from SAP Foxhound",
+  
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "foxhound-taint-monitor@m10x",
+      "strict_min_version": "57.0"
+    }
+  },
+  
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "<all_urls>"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "Foxhound Taint Monitor",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  
+  "web_accessible_resources": [
+    "injected.js"
+  ]
+}

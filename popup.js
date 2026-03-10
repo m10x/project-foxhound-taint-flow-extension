@@ -1,0 +1,354 @@
+document.addEventListener('DOMContentLoaded', function() {
+  const reportsContainer = document.getElementById('reportsContainer');
+  const noReports = document.getElementById('noReports');
+  const reportCount = document.getElementById('reportCount');
+  const filterInput = document.getElementById('filterInput');
+  const clearBtn = document.getElementById('clearBtn');
+  const openInTabBtn = document.getElementById('openInTabBtn');
+  
+  let allReports = [];
+  let filteredReports = [];
+  let expandedReports = new Set(); // Track which reports are expanded
+  
+  // Helper function to highlight tainted parts in any string
+  function highlightTaintedPart(text, taintedPart, highlightClass) {
+    if (!text || !taintedPart) return escapeHtml(text || '');
+    
+    const textStr = String(text);
+    const taintedIndex = textStr.indexOf(taintedPart);
+    if (taintedIndex !== -1) {
+      const before = escapeHtml(textStr.substring(0, taintedIndex));
+      const tainted = escapeHtml(textStr.substring(taintedIndex, taintedIndex + taintedPart.length));
+      const after = escapeHtml(textStr.substring(taintedIndex + taintedPart.length));
+      return `${before}<span class="${highlightClass}">${tainted}</span>${after}`;
+    }
+    return escapeHtml(textStr);
+  }
+  
+  function loadReports() {
+    chrome.runtime.sendMessage({type: 'GET_REPORTS'}, function(response) {
+      allReports = response.reports || [];
+      filteredReports = allReports;
+      updateDisplay();
+    });
+  }
+  
+  function updateDisplay() {
+    reportCount.textContent = `${allReports.length} reports`;
+    
+    if (filteredReports.length === 0) {
+      reportsContainer.innerHTML = '';
+      reportsContainer.appendChild(noReports);
+      return;
+    }
+    
+    noReports.style.display = 'none';
+    reportsContainer.innerHTML = '';
+    
+    filteredReports.forEach(report => {
+      const reportElement = createReportElement(report);
+      reportsContainer.appendChild(reportElement);
+      
+      // Restore expanded state if it was previously expanded
+      if (expandedReports.has(report.id)) {
+        const details = document.getElementById(`details-${report.id}`);
+        reportElement.classList.add('expanded');
+        details.classList.add('visible');
+      }
+    });
+  }
+  
+  function createReportElement(report) {
+    const div = document.createElement('div');
+    div.className = 'report-item';
+    div.dataset.reportId = report.id;
+    
+    const taintInfo = report.taint && report.taint.length > 0 ? report.taint[0] : null;
+    const taintedString = report.str ? report.str.value || report.str : 'Unknown';
+    
+    // Get the tainted part from sink
+    let taintedPart = '';
+    if (taintInfo && taintInfo.begin !== undefined && taintInfo.end !== undefined) {
+      taintedPart = taintedString.substring(taintInfo.begin, taintInfo.end);
+    }
+    
+    // Create highlighted string for sink (yellow highlighting)
+    let sinkStringHtml = highlightTaintedPart(taintedString, taintedPart, 'sink-highlight');
+    
+    // Get source string from flow and highlight the tainted part
+    let sourceStringHtml = 'N/A';
+    if (taintInfo && taintInfo.flow && taintInfo.flow.length > 0) {
+      // Find the source operation (where source: true)
+      const sourceFlow = taintInfo.flow.find(flowItem => flowItem.source === true);
+      if (sourceFlow) {
+        let foundHighlight = false;
+        let bestMatch = null;
+        
+        // First check filename
+        if (sourceFlow.location && sourceFlow.location.filename) {
+          const filename = sourceFlow.location.filename;
+          if (taintedPart && filename.indexOf(taintedPart) !== -1) {
+            sourceStringHtml = highlightTaintedPart(filename, taintedPart, 'source-highlight');
+            foundHighlight = true;
+          } else if (!bestMatch) {
+            bestMatch = filename;
+          }
+        }
+        
+        // Then check all arguments if not found in filename
+        if (!foundHighlight && sourceFlow.arguments && sourceFlow.arguments.length > 0) {
+          for (let i = 0; i < sourceFlow.arguments.length; i++) {
+            const arg = String(sourceFlow.arguments[i] || '');
+            if (arg && taintedPart && arg.indexOf(taintedPart) !== -1) {
+              sourceStringHtml = highlightTaintedPart(arg, taintedPart, 'source-highlight');
+              foundHighlight = true;
+              break;
+            }
+            // Keep track of the first non-empty argument as fallback
+            if (!bestMatch && arg.trim()) {
+              bestMatch = arg;
+            }
+          }
+        }
+        
+        // If not found anywhere, show the best available string
+        if (!foundHighlight && bestMatch) {
+          sourceStringHtml = escapeHtml(bestMatch);
+        }
+      }
+    }
+    
+    div.innerHTML = `
+      <div class="report-header clickable-header" data-report-id="${report.id}">
+        <div class="report-url" title="${report.url}">${report.url}</div>
+        <div class="report-time">${new Date(report.timestamp).toLocaleTimeString()}</div>
+      </div>
+      <div class="taint-summary clickable-header" data-report-id="${report.id}">
+        <div class="taint-info">
+          <span class="taint-label">Tainted Sink:</span> 
+          <span class="taint-string">"${sinkStringHtml}"</span>
+        </div>
+        <div class="taint-extract">
+          <span class="taint-label">Tainted Source:</span>
+          <span class="taint-string">"${sourceStringHtml}"</span>
+        </div>
+      </div>
+      <div class="report-details" id="details-${report.id}">
+        ${createDetailedView(report)}
+      </div>
+    `;
+    
+    // Add click handler only to the header elements
+    const clickableHeaders = div.querySelectorAll('.clickable-header');
+    clickableHeaders.forEach(header => {
+      header.addEventListener('click', function(e) {
+        e.stopPropagation(); // Prevent event bubbling
+        const details = document.getElementById(`details-${report.id}`);
+        const isExpanded = div.classList.contains('expanded');
+        
+        if (isExpanded) {
+          // Collapse this report
+          div.classList.remove('expanded');
+          details.classList.remove('visible');
+          expandedReports.delete(report.id);
+        } else {
+          // Expand this report
+          div.classList.add('expanded');
+          details.classList.add('visible');
+          expandedReports.add(report.id);
+        }
+      });
+    });
+    
+    return div;
+  }
+  
+  function createDetailedView(report) {
+    let html = '';
+    
+    // Add separate tainted parts section with color highlighting
+    if (report.taint && report.taint.length > 0) {
+      report.taint.forEach((taintItem, index) => {
+        const taintedString = report.str ? report.str.value || report.str : '';
+        
+        // Get the tainted part from sink
+        let taintedPart = '';
+        if (taintedString && taintItem.begin !== undefined && taintItem.end !== undefined) {
+          taintedPart = taintedString.substring(taintItem.begin, taintItem.end);
+        }
+        
+        // Create highlighted sink string (yellow highlighting)
+        let sinkStringHtml = highlightTaintedPart(taintedString, taintedPart, 'sink-highlight');
+        
+        // Get source string from flow and highlight the tainted part
+        let sourceStringHtml = 'N/A';
+        if (taintItem.flow && taintItem.flow.length > 0) {
+          // Find the source operation (where source: true)
+          const sourceFlow = taintItem.flow.find(flowItem => flowItem.source === true);
+          if (sourceFlow) {
+            let foundHighlight = false;
+            let bestMatch = null;
+            
+            // First check filename
+            if (sourceFlow.location && sourceFlow.location.filename) {
+              const filename = sourceFlow.location.filename;
+              if (taintedPart && filename.indexOf(taintedPart) !== -1) {
+                sourceStringHtml = highlightTaintedPart(filename, taintedPart, 'source-highlight');
+                foundHighlight = true;
+              } else if (!bestMatch) {
+                bestMatch = filename;
+              }
+            }
+            
+            // Then check all arguments if not found in filename
+            if (!foundHighlight && sourceFlow.arguments && sourceFlow.arguments.length > 0) {
+              for (let i = 0; i < sourceFlow.arguments.length; i++) {
+                const arg = String(sourceFlow.arguments[i] || '');
+                if (arg && taintedPart && arg.indexOf(taintedPart) !== -1) {
+                  sourceStringHtml = highlightTaintedPart(arg, taintedPart, 'source-highlight');
+                  foundHighlight = true;
+                  break;
+                }
+                // Keep track of the first non-empty argument as fallback
+                if (!bestMatch && arg.trim()) {
+                  bestMatch = arg;
+                }
+              }
+            }
+            
+            // If not found anywhere, show the best available string
+            if (!foundHighlight && bestMatch) {
+              sourceStringHtml = escapeHtml(bestMatch);
+            }
+          }
+        }
+        
+        html += `
+          <div class="taint-strings-section">
+            <h4>Taint Flow ${index + 1}:</h4>
+            <div class="taint-string-item">
+              <span class="taint-label">Tainted Sink:</span>
+              <div class="taint-string-content">"${sinkStringHtml}"</div>
+            </div>
+            <br>
+            <div class="taint-string-item">
+              <span class="taint-label">Tainted Source:</span>
+              <div class="taint-string-content">"${sourceStringHtml}"</div>
+            </div>
+          </div>
+        `;
+        
+        // Flow Details with highlighted args
+        html += `<h4>Flow Details ${index + 1}:</h4>`;
+        
+        if (taintItem.flow && taintItem.flow.length > 0) {
+          // Reverse the flow to show source -> sink order
+          const reversedFlow = [...taintItem.flow].reverse();
+          
+          reversedFlow.forEach((flowItem, flowIndex) => {
+            const isSource = flowItem.source;
+            
+            // Check if this is a sink - but not if it has ReportTaintSink
+            let isSink = false;
+            if (flowIndex === reversedFlow.length - 1) {
+              // If this is the last element, it's normally the sink
+              // But not if it contains ReportTaintSink
+              if (!(flowItem.arguments && flowItem.arguments.includes('ReportTaintSink'))) {
+                isSink = true;
+              }
+            } else if (flowIndex === reversedFlow.length - 2) {
+              // If this is the second-to-last element, check if the last one has ReportTaintSink
+              const lastElement = reversedFlow[reversedFlow.length - 1];
+              if (lastElement.arguments && lastElement.arguments.includes('ReportTaintSink')) {
+                isSink = true; // This is the real sink
+              }
+            }
+            
+            // Create clickable location link if location exists
+            let locationHtml = 'Unknown location';
+            if (flowItem.location && flowItem.location.filename) {
+              const filename = flowItem.location.filename;
+              const line = flowItem.location.line || 1;
+              const pos = flowItem.location.pos || 0;
+              const viewSourceUrl = `view-source:${filename}#line${line}`;
+              locationHtml = `<a href="${viewSourceUrl}" target="_blank" class="location-link" title="Open in view-source at line ${line}, position ${pos}">${filename}:${line}:${pos}</a>`;
+            }
+            
+            html += `
+              <div class="flow-item" style="border-left-color: ${isSource ? '#e74c3c' : isSink ? '#f39c12' : '#3498db'}">
+                <div class="flow-operation">
+                  ${isSource ? '🔴 SOURCE: ' : isSink ? '🟡 SINK: ' : '🔵 OP: '}${flowItem.operation}
+                </div>
+                <div class="flow-location">
+                  ${locationHtml}
+                </div>
+                ${flowItem.arguments && flowItem.arguments.length > 0 ? 
+                  `<div style="color: #666; font-size: 9px;">
+                    <div style="margin-bottom: 2px;">Args:</div>
+                    ${flowItem.arguments.map((arg, argIndex) => 
+                      `<div style="margin-left: 10px; margin-bottom: 1px;">
+                        <span style="color: #999;">[${argIndex}]:</span> 
+                        <span style="font-family: monospace;">"${highlightTaintedPart(arg, taintedPart, 'sink-highlight')}"</span>
+                      </div>`
+                    ).join('')}
+                  </div>` : ''}
+              </div>
+            `;
+          });
+        }
+      });
+    }
+    
+    html += '<h4>Raw Report:</h4>';
+    html += `<pre style="background: white; padding: 5px; overflow-x: auto; font-size: 9px;">${escapeHtml(JSON.stringify(report, null, 2))}</pre>`;
+    
+    return html;
+  }
+  
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  function filterReports() {
+    const filterText = filterInput.value.toLowerCase();
+    
+    if (!filterText) {
+      filteredReports = allReports;
+    } else {
+      filteredReports = allReports.filter(report => {
+        const searchText = JSON.stringify(report).toLowerCase();
+        return searchText.includes(filterText);
+      });
+    }
+    
+    updateDisplay();
+  }
+  
+  // Event listeners
+  filterInput.addEventListener('input', filterReports);
+  
+  clearBtn.addEventListener('click', function() {
+    if (confirm('Clear all taint reports?')) {
+      chrome.runtime.sendMessage({type: 'CLEAR_REPORTS'}, function() {
+        expandedReports.clear(); // Clear expanded state when clearing reports
+        loadReports();
+      });
+    }
+  });
+  
+  openInTabBtn.addEventListener('click', function() {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('popup.html')
+    });
+    // Close the popup after opening in tab
+    window.close();
+  });
+  
+  // Load reports on popup open
+  loadReports();
+  
+  // Refresh every 2 seconds while popup is open
+  setInterval(loadReports, 2000);
+});
