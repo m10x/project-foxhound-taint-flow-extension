@@ -2,6 +2,15 @@
 
 A Firefox browser extension for monitoring and visualizing taint flows from SAP Project Foxhound.
 
+## Screenshots
+
+**Overview**
+<img width="1201" height="323" alt="image" src="https://github.com/user-attachments/assets/0828bc44-26d0-4b77-aa9d-9d8d29009edb" />
+
+**Details**
+<img width="1202" height="1006" alt="image" src="https://github.com/user-attachments/assets/b44f1cb3-6521-4a28-a07c-e5309b349292" />
+
+
 ## Features
 
 - 🦊 Automatic detection of `__taintreport` events
