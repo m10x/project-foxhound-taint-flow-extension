@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
   function loadReports() {
     chrome.runtime.sendMessage({type: 'GET_REPORTS'}, function(response) {
       allReports = response.reports || [];
-      filteredReports = allReports;
-      updateDisplay();
+      // Re-apply current filter after refresh
+      filterReports();
     });
   }
   
@@ -74,13 +74,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Create highlighted string for sink (yellow highlighting)
     let sinkStringHtml = highlightTaintedPart(taintedString, taintedPart, 'sink-highlight');
+    // Determine sink operation from flow (flow is usually sink -> ... -> source)
+    let sinkOperation = 'N/A';
+    if (taintInfo && taintInfo.flow && taintInfo.flow.length > 0) {
+      const first = taintInfo.flow[0];
+      const second = taintInfo.flow.length > 1 ? taintInfo.flow[1] : null;
+      const firstIsWrapperSink = first && first.arguments && first.arguments.includes('ReportTaintSink');
+      const sinkFlowItem = firstIsWrapperSink && second ? second : first;
+      sinkOperation = (sinkFlowItem && sinkFlowItem.operation) ? String(sinkFlowItem.operation) : 'N/A';
+    }
     
     // Get source string from flow and highlight the tainted part
     let sourceStringHtml = 'N/A';
+    let sourceOperation = 'N/A';
     if (taintInfo && taintInfo.flow && taintInfo.flow.length > 0) {
       // Find the source operation (where source: true)
       const sourceFlow = taintInfo.flow.find(flowItem => flowItem.source === true);
       if (sourceFlow) {
+        sourceOperation = sourceFlow.operation ? String(sourceFlow.operation) : 'N/A';
         let foundHighlight = false;
         let bestMatch = null;
         
@@ -126,11 +137,11 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="taint-summary clickable-header" data-report-id="${report.id}">
         <div class="taint-info">
           <span class="taint-label">Tainted Sink:</span> 
-          <span class="taint-string">"${sinkStringHtml}"</span>
+          <span class="taint-string">"${sinkStringHtml}" (${escapeHtml(sinkOperation)})</span>
         </div>
         <div class="taint-extract">
           <span class="taint-label">Tainted Source:</span>
-          <span class="taint-string">"${sourceStringHtml}"</span>
+          <span class="taint-string">"${sourceStringHtml}" (${escapeHtml(sourceOperation)})</span>
         </div>
       </div>
       <div class="report-details" id="details-${report.id}">
@@ -179,13 +190,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create highlighted sink string (yellow highlighting)
         let sinkStringHtml = highlightTaintedPart(taintedString, taintedPart, 'sink-highlight');
+        // Determine sink operation from flow (flow is usually sink -> ... -> source)
+        let sinkOperation = 'N/A';
+        if (taintItem.flow && taintItem.flow.length > 0) {
+          const first = taintItem.flow[0];
+          const second = taintItem.flow.length > 1 ? taintItem.flow[1] : null;
+          const firstIsWrapperSink = first && first.arguments && first.arguments.includes('ReportTaintSink');
+          const sinkFlowItem = firstIsWrapperSink && second ? second : first;
+          sinkOperation = (sinkFlowItem && sinkFlowItem.operation) ? String(sinkFlowItem.operation) : 'N/A';
+        }
         
         // Get source string from flow and highlight the tainted part
         let sourceStringHtml = 'N/A';
+        let sourceOperation = 'N/A';
         if (taintItem.flow && taintItem.flow.length > 0) {
           // Find the source operation (where source: true)
           const sourceFlow = taintItem.flow.find(flowItem => flowItem.source === true);
           if (sourceFlow) {
+            sourceOperation = sourceFlow.operation ? String(sourceFlow.operation) : 'N/A';
             let foundHighlight = false;
             let bestMatch = null;
             
@@ -228,12 +250,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <h4>Taint Flow ${index + 1}:</h4>
             <div class="taint-string-item">
               <span class="taint-label">Tainted Sink:</span>
-              <div class="taint-string-content">"${sinkStringHtml}"</div>
+              <div class="taint-string-content">"${sinkStringHtml}" (${escapeHtml(sinkOperation)})</div>
             </div>
             <br>
             <div class="taint-string-item">
               <span class="taint-label">Tainted Source:</span>
-              <div class="taint-string-content">"${sourceStringHtml}"</div>
+              <div class="taint-string-content">"${sourceStringHtml}" (${escapeHtml(sourceOperation)})</div>
             </div>
           </div>
         `;
