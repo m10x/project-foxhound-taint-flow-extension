@@ -438,8 +438,14 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
     
-    html += '<h4>Raw Report:</h4>';
-    html += `<pre style="background: white; padding: 5px; overflow-x: auto; font-size: 9px;">${escapeHtml(JSON.stringify(report, null, 2))}</pre>`;
+    html += `
+      <details class="raw-report">
+        <summary>Raw Report</summary>
+        <pre style="background: white; padding: 5px; overflow-x: auto; font-size: 9px; margin-top: 4px;">
+${escapeHtml(JSON.stringify(report, null, 2))}
+        </pre>
+      </details>
+    `;
     
     return html;
   }
