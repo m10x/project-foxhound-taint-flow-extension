@@ -38,10 +38,10 @@ A Firefox browser extension for monitoring and visualizing taint flows from SAP 
 
 ## Usage
 
-1. Pin the extension to the toolbar
+1. By default, the extension should be pinned to the toolbar. If it isn't you can do it yourself:
 <img width="443" height="266" alt="image" src="https://github.com/user-attachments/assets/2eae0c13-383d-4f56-94e2-701d161475da" />
 
-2. For better visibility, Foxhound Taint Monitor can be opened in a new tab.
+2. For better visibility, Foxhound Taint Monitor can be opened in a new tab:
 <img width="616" height="548" alt="image" src="https://github.com/user-attachments/assets/de0cc91a-f920-443b-856b-e313cf585125" />
 
 3. Get familiar with Foxhound and this extension e.g. by using the DOM XSS Exercises at [DomGoat](https://domgo.at/cxss/example/1?payload=abcd&sp=x#12345)
